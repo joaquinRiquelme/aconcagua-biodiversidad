@@ -14,92 +14,101 @@ biodiversidad <- tibble(data.inicial[,c("Sitio","Riqueza","Shannon","Simpson")])
 Sitio <- tibble(data.inicial[,c("Sitio","Longitud","Latitud")])
 Topografica <- tibble(data.inicial[c("Sitio","Elevación","Pendiente.Porcentaje","Exposición")])
 
-flights <- flights[1:16,]
-flights$origin <- biodiversidad$Sitio
-flights$arr_time<- biodiversidad$Riqueza
-flights$dep_time<- biodiversidad$Shannon
-flights$dep_delay<- biodiversidad$Simpson
+flights <-
 
-biodiversidad <- biodiversidad %>%
-  left_join(Sitio) %>%
-  left_join(Topografica)
-
-
-
-# flights <- flights %>%
-#   left_join(
-#     airports %>%
-#       transmute(dest_name = paste0(name, " (", faa, ")"), dest = faa, end_lat = lat, end_lon = lon)
-#   ) %>%
-#   filter(!is.na(dest_name)) %>%
-#   left_join(
-#     airports %>% select(origin = faa, start_lat = lat, start_lon = lon)
-#   ) %>%
-#   left_join(airlines, by = "carrier") %>%
-#   rename(carrier_name = name) %>%
-#   left_join(weather) %>%
-#   mutate(
-#     # The overwhelming majority of precipation is 0 so transform
-#     # with some help from MASS::boxcox() https://stats.stackexchange.com/a/1452/48604
-#     precip = scales::rescale(precip^-1.55/-.55),
-#     date = lubridate::ymd(paste(year, month, day, sep = "-"))
-#   )
+flights <- flights %>%
+  left_join(
+    airports %>%
+      transmute(dest_name = paste0(name, " (", faa, ")"), dest = faa, end_lat = lat, end_lon = lon)
+  ) %>%
+  filter(!is.na(dest_name)) %>%
+  left_join(
+    airports %>% select(origin = faa, start_lat = lat, start_lon = lon)
+  ) %>%
+  left_join(airlines, by = "carrier") %>%
+  rename(carrier_name = name) %>%
+  left_join(weather) %>%
+  mutate(
+    # The overwhelming majority of precipation is 0 so transform
+    # with some help from MASS::boxcox() https://stats.stackexchange.com/a/1452/48604
+    precip = scales::rescale(precip^-1.55/-.55),
+    date = lubridate::ymd(paste(year, month, day, sep = "-"))
+  )
+head(flights)
 
 PRIMARY <- "#0675DD"
 
 sidebar_acc <- accordion(
-  open = c("Sitio", "Destination"),
+  open = c("Origin", "Destination"),
   accordion_panel(
-    "sitio", icon = icon("plane-departure"),
-    uiOutput("sitio_reset"),
+    "Origin", icon = icon("plane-departure"),
+    uiOutput("origin_reset"),
     checkboxGroupInput(
-      "sitio", NULL,
-      choices = sort(unique(biodiversidad$Sitio)),
+      "origin", NULL,
+      choices = sort(unique(flights$origin)),
       inline = TRUE
     )
   ),
   accordion_panel(
-    "Diversidad", icon = icon("clock"),
+    "Destination", icon = icon("plane-arrival"),
+    selectInput(
+      "dest_name", NULL,
+      sort(unique(flights$dest_name)),
+      multiple = TRUE,
+      width = "100%"
+    )
+  ),
+  accordion_panel(
+    "Carrier", icon = icon("user-tie"),
+    selectInput(
+      "carrier_name", NULL,
+      unique(flights$carrier_name),
+      multiple = TRUE,
+      width = "100%"
+    )
+  ),
+  accordion_panel(
+    "Flight time", icon = icon("clock"),
     input_histoslider(
-      "diversidad_riqueza", "Riqueza",
-      biodiversidad$Riqueza, height = 125,
+      "sched_dep_time", "Departure time",
+      flights$sched_dep_time, height = 125,
       options = list(
         handleLabelFormat = "0d",
         selectedColor = PRIMARY
       )
     ),
     input_histoslider(
-      "diversidad_shannon", "Shannon",
-      biodiversidad$Shannon, height = 125,
+      "sched_arr_time", "Arrival time",
+      flights$sched_arr_time, height = 125,
       options = list(
         handleLabelFormat = "0d",
         selectedColor = PRIMARY
       )
     ),
     input_histoslider(
-      "diversidad_simpson", "simpson",
-      biodiversidad$Simpson, height = 125, #breaks = "months",
+      "date", "Date",
+      flights$date, height = 125, breaks = "months",
       options = list(
-        # handleLabelFormat = "%b %e",
+        handleLabelFormat = "%b %e",
         selectedColor = PRIMARY
       )
     )
   ),
   accordion_panel(
-    "Topografica", icon = icon("cloud-rain"),
+    "Weather", icon = icon("cloud-rain"),
     input_histoslider(
-      "topografica_elevacion", "Elevación",
-      biodiversidad$Elevación, height = 125,
+      "precip", "Precipitation",
+      flights$precip, height = 125,
       options = list(selectedColor = PRIMARY)
     ),
     input_histoslider(
-      "topografica_pendiente", "Pendiente",
-      biodiversidad$Pendiente.Porcentaje, height = 125,
+      "wind_speed", "Wind speed",
+      flights$wind_speed, height = 125,
       options = list(selectedColor = PRIMARY)
     ),
     input_histoslider(
-      "topografica_exposición", "Exposición",
-      biodiversidad$Exposición, height = 125,
+      "wind_gust", "Wind gust",
+      flights$wind_gust, height = 125,
       options = list(selectedColor = PRIMARY)
     )
   )
@@ -108,52 +117,31 @@ sidebar_acc <- accordion(
 
 flights_card <- card(
   full_screen = TRUE,
-  card_header("Sitios"),
-  plotlyOutput("sitios_mapa"),
-  card_footer("sitios")
+  card_header("Flight paths"),
+  plotlyOutput("flight_paths"),
+  card_footer("Marker areas are proportional to mean arrival delay")
 )
 
-# delay_corr_card <- card(
-#   full_screen = TRUE,
-#   card_header(
-#     "Arrival vs departure delay",
-#     checkboxInput("scatter_summarize", "Summarize", TRUE, width = "fit-content"),
-#     class = "d-flex justify-content-between"
-#   ),
-#   plotlyOutput("scatter_delay")
-# )
-bio_elev_card <- card(
+delay_corr_card <- card(
   full_screen = TRUE,
   card_header(
-    "Biodiversidad vs altitud",
+    "Arrival vs departure delay",
     checkboxInput("scatter_summarize", "Summarize", TRUE, width = "fit-content"),
     class = "d-flex justify-content-between"
   ),
-  plotlyOutput("scatter_elevacion")
+  plotlyOutput("scatter_delay")
 )
 
-# delay_card <- navset_card_pill(
-#   title = "Arrival delay",
-#   full_screen = TRUE,
-#   nav_panel(
-#     "Overall",
-#     plotlyOutput("arr_delay")
-#   ),
-#   nav_panel(
-#     "Over time",
-#     plotlyOutput("arr_delay_series")
-#   )
-# )
-shannon_card <- navset_card_pill(
-  title = "Shannon",
+delay_card <- navset_card_pill(
+  title = "Arrival delay",
   full_screen = TRUE,
   nav_panel(
-    "Shannon",
-    plotlyOutput("shannon_plot")
+    "Overall",
+    plotlyOutput("arr_delay")
   ),
   nav_panel(
-    "Simpson",
-    plotlyOutput("simpson_plot")
+    "Over time",
+    plotlyOutput("arr_delay_series")
   )
 )
 
@@ -174,13 +162,13 @@ ui <- page_navbar(
   fillable = TRUE,
   sidebar = sidebar(sidebar_acc),
   nav_panel(
-    "Diversidad",
+    "Delays",
     uiOutput("value_boxes"),
     layout_column_wrap(
       width = "200px", class = "my-3",
-      bio_elev_card, 
+      flights_card, delay_corr_card
     ),
-    shannon_card
+    delay_card
   ),
   nav_panel(
     "Durations",
@@ -210,12 +198,13 @@ server <- function(input, output, session) {
   # Mapping from input id name to updating input function
   input_discrete_vars <- list(
     origin = function(...) updateCheckboxGroupInput(..., inline = TRUE),
-    sitio = updateSelectInput
+    dest_name = updateSelectInput,
+    carrier_name = updateSelectInput
   )
   input_numeric_vars <- list(
-    biodiversidad_riqueza = update_histoslider,
-    biodiversidad_shannon = update_histoslider,
-    biodiversidad_simpson = update_histoslider
+    sched_dep_time = update_histoslider,
+    sched_arr_time = update_histoslider,
+    date = update_histoslider
   )
   input_vars <- c(
     input_discrete_vars,
@@ -258,7 +247,7 @@ server <- function(input, output, session) {
   lapply(names(input_vars), function(var) {
 
     index <- reactive({
-      filter_index(biodiversidad[, setdiff(names(input_vars), var)])
+      filter_index(flights[, setdiff(names(input_vars), var)])
     })
 
     observeEvent(index(), ignoreInit = TRUE, ignoreNULL = FALSE, {
@@ -285,34 +274,31 @@ server <- function(input, output, session) {
     })
   })
 
-  output$sitio_reset <- renderUI({
+  output$origin_reset <- renderUI({
     actionLink(
-      "sitio_reset", "Reset",
+      "origin_reset", "Reset",
       style = htmltools::css(
         text_decoration = "none",
         font_weight = 700,
         font_size = ".875rem",
         float = "right",
-        visibility = if (length(input$sitio) > 0) "visible" else "hidden",
+        visibility = if (length(input$origin) > 0) "visible" else "hidden",
         margin_top = "-7px"
       )
     )
   })
 
-  observeEvent(input$sitio_reset, {
+  observeEvent(input$origin_reset, {
     updateCheckboxGroupInput(
-      inputId = "sitio",
-      choices = sort(unique(biodiversidad$Sitio)),
+      inputId = "origin",
+      choices = sort(unique(flights$origin)),
       selected = character(0)
     )
   })
 
   # Flights with all filters applied (i.e., data used for value boxes/plots)
-  # flight_dat <- reactive({
-  #   flights[filter_index(flights), ]
-  # })
-  biodiversidad_dat <- reactive({
-    biodiversidad[filter_index(biodiversidad), ]
+  flight_dat <- reactive({
+    flights[filter_index(flights), ]
   })
 
   output$value_boxes <- renderUI({
@@ -360,39 +346,7 @@ server <- function(input, output, session) {
   }) %>%
     bindCache(flight_dat())
 
-  # output$flight_paths <- renderPlotly({
-  #   flight_dat() %>%
-  #     group_by(start_lon, start_lat, end_lon, end_lat, origin, dest) %>%
-  #     summarise(mean_delay = mean(arr_delay, na.rm = TRUE)) %>%
-  #     plot_geo(color = I("#0D6EFD"), showlegend = FALSE) %>%
-  #     add_segments(
-  #       x = ~start_lon, xend = ~end_lon,
-  #       y = ~start_lat, yend = ~end_lat,
-  #       alpha = 0.5, size = I(1), hoverinfo = "none"
-  #     ) %>%
-  #     add_markers(
-  #       x = ~end_lon, y = ~end_lat, size = ~mean_delay,
-  #       hoverinfo = "text", alpha = 0.1,
-  #       text = ~paste0(
-  #         origin, " -> ", dest, "<br>",
-  #         "Average delay: ", round(mean_delay, 1)
-  #       )
-  #     ) %>%
-  #     config(displayModeBar = FALSE) %>%
-  #     layout(
-  #       geo = list(
-  #         projection = list(
-  #           type = 'orthographic',
-  #           rotation = list(lon = -100, lat = 40, roll = 0)
-  #         ),
-  #         showland = TRUE,
-  #         landcolor = toRGB("gray95"),
-  #         countrycolor = toRGB("gray80")
-  #       )
-  #     )
-  # })
-  # 
-  output$sitios_mapa <- renderPlotly({
+  output$flight_paths <- renderPlotly({
     flight_dat() %>%
       group_by(start_lon, start_lat, end_lon, end_lat, origin, dest) %>%
       summarise(mean_delay = mean(arr_delay, na.rm = TRUE)) %>%
