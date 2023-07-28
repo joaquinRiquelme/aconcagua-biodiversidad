@@ -36,7 +36,7 @@ flights <- flights %>%
   )
 head(flights)
 
-PRIMARY <- "#0675DD"
+PRIMARY <- "#1F0E68"
 
 sidebar_acc <- accordion(
   open = c("Origin", "Destination"),
